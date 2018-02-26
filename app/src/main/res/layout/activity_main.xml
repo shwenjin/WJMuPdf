@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.artifex.mupdfdemo.WJPdfView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mupdf"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.wj.simplemupdf.MainActivity">
+
+</com.artifex.mupdfdemo.WJPdfView>
