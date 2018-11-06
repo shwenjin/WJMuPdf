@@ -3,6 +3,7 @@ package com.artifex.mupdfdemo;
 import android.content.Context;
 import android.graphics.Point;
 import android.graphics.PointF;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
@@ -42,6 +43,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
 		if (pageSize != null) {
 			// We already know the page size. Set it up
 			// immediately
+			Log.d("tag","pageSize->"+pageSize.x+","+pageSize.y);
 			pageView.setPage(position, pageSize);
 		} else {
 			// Page size as yet unknown. Blank it for now, and
@@ -60,11 +62,11 @@ public class MuPDFPageAdapter extends BaseAdapter {
 					mPageSizes.put(position, result);
 					// Check that this view hasn't been reused for
 					// another page since we started
+					Log.d("tag","onPostExecutepageSize->"+result.x+","+result.y);
 					if (pageView.getPage() == position)
 						pageView.setPage(position, result);
 				}
 			};
-
 			sizingTask.execute((Void)null);
 		}
 		return pageView;

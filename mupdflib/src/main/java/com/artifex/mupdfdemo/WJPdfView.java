@@ -8,20 +8,26 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
+import android.text.format.Formatter;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by wenjin on 2018/1/19.
@@ -32,6 +38,7 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
     LinearLayout mLinearProgress;
     TextView mTxtPage;
     ImageView mImageEntireScreen;
+    TextView mTxtSize;
     SpringProgressView mProgressBar;
     private OnPdfListener mOnPdfListener;
     private Context mContext;
@@ -54,6 +61,8 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
     private boolean isStop=false;
     private String mFolder;
     private String mUrl;
+    private boolean isRead=false;
+    private AtomicBoolean isOpen = new AtomicBoolean(false);
     public WJPdfView(Context context) {
         super(context);
         init(context);
@@ -76,8 +85,15 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
         mTxtPage=findViewById(R.id.txt_page);
         mImageEntireScreen=findViewById(R.id.image_entire_screen);
         mProgressBar=findViewById(R.id.spring_progress);
+        mTxtSize=findViewById(R.id.txt_size);
         mImageEntireScreen.setOnClickListener(this);
         this.mContext=context;
+        mAlertBuilder = new AlertDialog.Builder(mContext);
+    }
+
+    public void setProgressVisibility(int visibility){
+        mTxtSize.setVisibility(visibility);
+        mProgressBar.setVisibility(visibility);
     }
 
     @Override
@@ -109,31 +125,55 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
         openPDF(path,0);
     }
 
+    public boolean isOpen(){
+        return isOpen.get();
+    }
+
     public void openPDF(String path,int position){
         this.mUrl=path;
         this.mHistoryPosition=position;
+        isRead=false;
+        isOpen.set(true);
+        mImageEntireScreen.setVisibility(GONE);
         mLinearProgress.setVisibility(View.VISIBLE);
         if(TextUtils.isEmpty(mUrl)){
-            throw new NullPointerException();
-        }
+            AlertDialog alert = mAlertBuilder.create();
+            alert.setTitle(R.string.cannot_open_document);
+            alert.setButton(AlertDialog.BUTTON_POSITIVE, mContext.getString(R.string.dismiss),
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            mOnPdfListener.finish();
+                        }
+                    });
+            alert.setOnCancelListener(new DialogInterface.OnCancelListener() {
 
-        if(mUrl.startsWith("http://")){
-            String temp= DBUtils.getInstance(mContext).selectCacheUrl(mUrl);
-            if(TextUtils.isEmpty(temp)){
-                checkPermission();
-            }else {
-                File file=new File(temp);
-                if(!file.exists()){
-                    checkPermission();
-                }else{
-                    mLinearProgress.setVisibility(View.GONE);
-                    initCore(temp);
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    mOnPdfListener.finish();
                 }
-            }
-        }else{
-            mLinearProgress.setVisibility(View.GONE);
-            initCore(mUrl);
+            });
+            alert.show();
+            return;
         }
+        removePDF();
+        mFrameLayout.removeAllViews();
+        if(mUrl.startsWith("http://")||mUrl.startsWith("https://")){
+            String tempPath= DBUtils.getInstance(mContext).selectCacheUrl(mUrl);
+            if(TextUtils.isEmpty(tempPath)){
+                checkPermission();
+                return;
+            }
+            File file=new File(tempPath);
+            if(!file.exists()){
+                checkPermission();
+                return;
+            }
+            mLinearProgress.setVisibility(View.GONE);
+            initCore(tempPath);
+            return;
+        }
+        mLinearProgress.setVisibility(View.GONE);
+        initCore(mUrl);
     }
 
     private void checkPermission(){
@@ -155,6 +195,7 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
             public void updateProgress(long currentSize, long totalSize) {
                 mProgressBar.setMaxCount(totalSize);
                 mProgressBar.setCurrentCount(currentSize);
+                mTxtSize.setText(Formatter.formatFileSize(mContext, currentSize)+"/"+Formatter.formatFileSize(mContext, totalSize));
             }
 
             @Override
@@ -168,6 +209,7 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
             @Override
             public void onFailure() {
                 Log.d("tag","下载失败");
+                isOpen.set(false);
             }
         });
     }
@@ -220,7 +262,16 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
                 mMaxPage=core.countPages();
                 mCurrentPage=i + 1;
                 if(core.countPages()==(mCurrentPage)){
-                    mOnPdfListener.onCompletion();
+                    if(mOnPdfListener!=null){
+                        mOnPdfListener.onCompletion();
+                    }
+                }
+                float  count=(core.countPages()*0.9f);
+                if((count<=mCurrentPage)&&(!isRead)){
+                    isRead=true;
+                    if(mOnPdfListener!=null){
+                        mOnPdfListener.onFinishRate90();
+                    }
                 }
                 super.onMoveToChild(i);
             }
@@ -269,9 +320,10 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
         }
         if (core == null)
             return;
+        isOpen.set(false);
+        mImageEntireScreen.setVisibility(VISIBLE);
+        onStart();
     }
-
-
 
     private void createAlertWaiter() {
         mAlertsActive = true;
@@ -444,7 +496,41 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
         }
     }
 
+    public void onConfigurationChanged(boolean isPortrait){
+        if (isPortrait) {
+            setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));//设置显示的高度
+            requestLayout();
+            updateAdapter();
+        } else  {
+            setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            requestLayout();
+            updateAdapter();
+        }
+    }
+
+    public void onConfigurationChanged(boolean isPortrait,int height){
+        if (isPortrait) {
+            if(mDocView!=null) {
+                mDocView.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, height));
+                mDocView.requestLayout();
+            }
+            requestLayout();
+            updateAdapter();
+        } else  {
+            if(mDocView!=null) {
+                mDocView.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                mDocView.requestLayout();
+            }
+            requestLayout();
+            updateAdapter();
+        }
+    }
+
     public void onDestroy(){
+        removePDF();
+    }
+
+    private void removePDF(){
         if (core != null)
             core.onDestroy();
         if (mAlertTask != null) {
@@ -452,10 +538,11 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
             mAlertTask = null;
         }
         core = null;
+        isOpen.set(false);
     }
 
     public void onStart(){
-        if(isStop&&mOnPdfListener!=null){
+        if(mOnPdfListener!=null){
             mOnPdfListener.onstart();
         }
     }
@@ -471,6 +558,7 @@ public class WJPdfView extends FrameLayout implements View.OnClickListener{
     public interface OnPdfListener{
         public void finish();
         public void onCompletion();
+        public void onFinishRate90();
         public void toggleScreen();
         public void onstart();
     }

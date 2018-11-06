@@ -19,7 +19,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         instance = ScreenSwitchUtils.init(this.getApplicationContext());
         mPdfView= (WJPdfView) findViewById(R.id.mupdf);
-        mPdfView.openPDF("http://obor.ecache.cn:80/Uplode/Books/Data/bd71945e00e54ad1a891974bac6b61dd.pdf");
         mPdfView.setOnPdfListener(new WJPdfView.OnPdfListener() {
             @Override
             public void finish() {
@@ -29,6 +28,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onCompletion() {
                 //观看完成
+            }
+
+            @Override
+            public void onFinishRate90() {
+
             }
 
             @Override
@@ -43,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
                 instance.start(MainActivity.this);
             }
         });
+
+        mPdfView.openPDF("https://apps.ecache.cn/ipa/testpdf.pdf");
     }
 
     @Override

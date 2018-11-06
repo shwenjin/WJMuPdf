@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mupdf"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="180dp"
     tools:context="com.wj.simplemupdf.MainActivity">
 
 </com.artifex.mupdfdemo.WJPdfView>
